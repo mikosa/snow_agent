@@ -17,42 +17,23 @@ import plotly.express as px
 # Page config
 st.set_page_config(page_title="Operations Analysis Agent", page_icon="⚙️", layout="wide")
 
-# Initialize once
-@st.cache_resource
-def init_app():
+try:
     settings = get_settings()
     engine = get_engine(settings.db_path)
     init_db(engine)
     file_store = FileStore(settings.data_dir)
-    llm_client = LLMClient(settings.llm_base_url, settings.llm_headers, settings.llm_timeout)
+    llm_client = LLMClient(settings.llm_base_url, settings.llm_headers, settings.llm_model, settings.llm_timeout)
     parser = ToolCallParser()
     registry = ToolRegistry()
     register_all_tools(registry)
     session_mgr = SessionManager(SessionLocal, file_store)
     agent = Agent(llm_client, registry, session_mgr, parser, settings)
-    return settings, file_store, session_mgr, agent
-
-try:
-    settings, file_store, session_mgr, agent = init_app()
 except Exception as e:
+    import traceback
+    print(f"CRITICAL INIT ERROR: {e}")
+    traceback.print_exc()
     st.error(f"Failed to initialize app: {e}")
-    # Continue with mock setup for UI demo purposes if dependencies are missing during phase 4
-    class MockDataState:
-        def __init__(self):
-            self.row_count = 0
-            self.column_count = 0
-            self.is_cleaned = False
-            self.is_entities_extracted = False
-            self.is_embedded = False
-            self.is_clustered = False
-            self.is_categorized = False
-            self.is_subcategorized = False
-            
-    if "session_id" not in st.session_state:
-        st.session_state.session_id = "mock_id"
-        st.session_state.conversation_history = []
-        st.session_state.data_state = MockDataState()
-        st.session_state.artifacts = {}
+    st.stop()
 
 if "session_id" not in st.session_state:
     session_data = session_mgr.create_session("Default")
@@ -140,10 +121,19 @@ with col_chat:
                     st.write(msg)
                 
                 placeholder = st.empty()
-                # Here we would call agent.handle_message
-                # agent.handle_message(prompt, st.session_state.session_id, status_callback)
-                response_text = f"I've received your request: '{prompt}'. This is a mock response from the agent."
-                placeholder.markdown(response_text)
+                streamed_text = []
+
+                def on_token(token):
+                    streamed_text.append(token)
+                    placeholder.markdown("".join(streamed_text))
+                    
+                response = agent.handle_message(
+                    session_id=st.session_state.session_id,
+                    user_message=prompt,
+                    status_callback=status_callback,
+                    stream_callback=on_token
+                )
+                response_text = response.text
                 status.update(label="Complete", state="complete", expanded=False)
                 
         st.session_state.conversation_history.append({"role": "assistant", "content": response_text})

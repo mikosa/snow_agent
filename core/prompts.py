@@ -5,6 +5,11 @@ import json
 def format_data_context(session_data: dict) -> str:
     """Builds the current data context section for the prompt."""
     data_state = session_data.get('data_state', {})
+    
+    # Handle data_state whether it's a dictionary or a dataclass
+    if not isinstance(data_state, dict):
+        data_state = getattr(data_state, '__dict__', {})
+
     row_count = data_state.get('row_count', 'Unknown')
     cols = data_state.get('column_names', [])
     cols_str = ', '.join(cols) if cols else 'None'
@@ -38,15 +43,7 @@ def build_system_prompt(session_data: dict, tools: list[BaseTool]) -> str:
     # 2. Available Tools
     prompt += "## Available Tools\n"
     for tool in tools:
-        prompt += f"### {tool.name}\n"
-        prompt += f"Description: {tool.description}\n"
-        if tool.parameters:
-            prompt += "Parameters:\n"
-            for param in tool.parameters:
-                prompt += f"- {param.name} ({param.type}): {param.description} (Required: {param.required})\n"
-        if tool.required_data_state:
-            prompt += f"Requires: {', '.join(tool.required_data_state)}\n"
-        prompt += "\n"
+        prompt += tool.get_prompt_definition() + "\n\n"
         
     # 3. Tool Calling Convention
     prompt += "## Tool Calling Convention\n"
