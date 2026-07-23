@@ -137,6 +137,21 @@ class SessionManager:
             ds_model.is_subcategorized = session_data.data_state.is_subcategorized
             ds_model.artifacts_json = json.dumps(session_data.artifacts)
             
+            # Sync uploads
+            existing_upload_ids = {u.id for u in session_model.uploads}
+            for u_data in session_data.uploads:
+                if u_data["id"] not in existing_upload_ids:
+                    db.add(Upload(
+                        id=u_data["id"],
+                        session_id=session_data.id,
+                        filename=u_data["filename"],
+                        file_path=u_data["file_path"],
+                        row_count=u_data["row_count"],
+                        columns_json=u_data["columns_json"],
+                        file_size_bytes=u_data["file_size_bytes"]
+                    ))
+                    existing_upload_ids.add(u_data["id"])
+            
             # Sync conversation history
             # For simplicity, we just clear and rewrite the history 
             # if we are doing full persist (since it's small)
@@ -180,12 +195,20 @@ class SessionManager:
                 active_upload_id = None
                 
             uploads = []
+            active_upload = None
             for u in session_model.uploads:
-                uploads.append({
+                upl_dict = {
                     "id": u.id, "filename": u.filename, "file_path": u.file_path,
                     "row_count": u.row_count, "columns_json": u.columns_json,
                     "file_size_bytes": u.file_size_bytes
-                })
+                }
+                uploads.append(upl_dict)
+                if active_upload_id and u.id == active_upload_id:
+                    active_upload = upl_dict
+                    
+            if active_upload:
+                data_state.row_count = active_upload["row_count"]
+                data_state.column_names = json.loads(active_upload["columns_json"]) if active_upload["columns_json"] else []
                 
             conv_history = [{"role": c.role, "content": c.content} 
                             for c in sorted(session_model.conversations, key=lambda x: x.id)]

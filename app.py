@@ -21,6 +21,7 @@ try:
     settings = get_settings()
     engine = get_engine(settings.db_path)
     init_db(engine)
+    SessionLocal.configure(bind=engine)
     file_store = FileStore(settings.data_dir)
     llm_client = LLMClient(settings.llm_base_url, settings.llm_headers, settings.llm_model, settings.llm_timeout)
     parser = ToolCallParser()
@@ -50,7 +51,33 @@ if uploaded_file is not None:
     if "uploaded" not in st.session_state or st.session_state.uploaded != uploaded_file.name:
         st.session_state.uploaded = uploaded_file.name
         st.sidebar.success(f"Uploaded {uploaded_file.name}")
-        df = pd.read_csv(uploaded_file)
+        try:
+            df = pd.read_csv(uploaded_file)
+        except UnicodeDecodeError:
+            uploaded_file.seek(0)
+            df = pd.read_csv(uploaded_file, encoding="latin1")
+            
+        # Save file to disk
+        import uuid
+        upload_id = str(uuid.uuid4())
+        uploaded_file.seek(0)
+        file_path = file_store.save_upload(upload_id, uploaded_file.getvalue(), uploaded_file.name)
+        
+        # Update database with upload info
+        upload_info = {
+            "id": upload_id,
+            "filename": uploaded_file.name,
+            "file_path": str(file_path),
+            "row_count": len(df),
+            "columns_json": json.dumps(list(df.columns)),
+            "file_size_bytes": uploaded_file.size
+        }
+        session_mgr.add_upload(st.session_state.session_id, upload_info)
+        session_mgr.update_data_state(st.session_state.session_id, {
+            "row_count": len(df),
+            "column_names": list(df.columns)
+        })
+
         st.sidebar.subheader("Data Preview")
         st.sidebar.dataframe(df.head())
         
@@ -116,11 +143,13 @@ with col_chat:
             st.markdown(prompt)
             
         with st.chat_message("assistant"):
-            with st.status("Processing...", expanded=True) as status:
+            status = st.status("Processing...", expanded=True)
+            placeholder = st.empty()
+            
+            with status:
                 def status_callback(msg):
                     st.write(msg)
                 
-                placeholder = st.empty()
                 streamed_text = []
 
                 def on_token(token):
