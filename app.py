@@ -136,6 +136,10 @@ with col_chat:
     for msg in st.session_state.conversation_history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
+            if msg.get("artifacts"):
+                for name, path in msg["artifacts"].items():
+                    if str(path).endswith(".png") or str(path).endswith(".jpg"):
+                        st.image(str(path))
             
     if prompt := st.chat_input("Ask something about the data or run a tool..."):
         st.session_state.conversation_history.append({"role": "user", "content": prompt})
@@ -165,7 +169,16 @@ with col_chat:
                 response_text = response.text
                 status.update(label="Complete", state="complete", expanded=False)
                 
-        st.session_state.conversation_history.append({"role": "assistant", "content": response_text})
+            if response.artifacts:
+                for name, path in response.artifacts.items():
+                    if str(path).endswith(".png") or str(path).endswith(".jpg"):
+                        st.image(str(path))
+                
+        st.session_state.conversation_history.append({
+            "role": "assistant", 
+            "content": response_text,
+            "artifacts": response.artifacts
+        })
 
 with col_results:
     st.subheader("Results")

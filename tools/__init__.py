@@ -6,6 +6,7 @@ from .agglom_cluster import AgglomClusterTool
 from .llm_message import LLMMessageTool
 from .category_cluster import CategoryClusterTool
 from .subcategory_cluster import SubcategoryClusterTool
+from .python_executor import PythonExecutorTool
 
 def register_all_tools(registry):
     registry.register(CleanScrubTool())
@@ -15,3 +16,4 @@ def register_all_tools(registry):
     registry.register(LLMMessageTool())
     registry.register(CategoryClusterTool())
     registry.register(SubcategoryClusterTool())
+    registry.register(PythonExecutorTool())

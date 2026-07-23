@@ -146,9 +146,9 @@ class SessionManager:
                         session_id=session_data.id,
                         filename=u_data["filename"],
                         file_path=u_data["file_path"],
-                        row_count=u_data["row_count"],
-                        columns_json=u_data["columns_json"],
-                        file_size_bytes=u_data["file_size_bytes"]
+                        row_count=u_data.get("row_count", 0),
+                        columns_json=u_data.get("columns_json", "[]"),
+                        file_size_bytes=u_data.get("file_size_bytes", 0)
                     ))
                     existing_upload_ids.add(u_data["id"])
             

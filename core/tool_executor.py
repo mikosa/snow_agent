@@ -20,11 +20,7 @@ class ToolExecutor:
             return StepResult(success=False, summary=f"Prerequisites not met: {reason}")
             
         try:
-            # Here we would actually pass real context, this is simplified
-            result = tool.execute(tool_args, {})
-            if result.success:
-                # Update session state based on tool's effect
-                pass
+            result = tool.execute(vars(session_data), tool_args)
             return result
         except Exception as e:
             return StepResult(success=False, summary=f"Execution error: {str(e)}")
